@@ -2,9 +2,13 @@ import 'dotenv/config'
 import express from 'express'
 import { createServer } from 'http'
 import { Server } from 'socket.io'
-import authRoutes from './modules/auth/auth.routes'
-import { authMiddleware } from './shared/middleware/auth.middleware'
-import { tenantMiddleware } from './shared/middleware/tenant.middleware'
+import authRoutes         from './modules/auth/auth.routes'
+import companiesRoutes    from './modules/companies/companies.routes'
+import staffRoutes        from './modules/staff/staff.routes'
+import servicesRoutes     from './modules/services/services.routes'
+import businessHoursRoutes from './modules/business-hours/business-hours.routes'
+import { authMiddleware }         from './shared/middleware/auth.middleware'
+import { tenantMiddleware }       from './shared/middleware/tenant.middleware'
 import { subscriptionMiddleware } from './shared/middleware/subscription.middleware'
 
 const app = express()
@@ -22,6 +26,12 @@ app.use('/auth', authRoutes)
 
 // Protected middleware chain applied globally after this point
 app.use(authMiddleware, tenantMiddleware, subscriptionMiddleware)
+
+// Protected routes
+app.use('/companies',     companiesRoutes)
+app.use('/staff',         staffRoutes)
+app.use('/services',      servicesRoutes)
+app.use('/business-hours', businessHoursRoutes)
 
 io.on('connection', (socket) => {
   socket.on('join', (room: string) => {
