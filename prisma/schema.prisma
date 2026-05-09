@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -10,4 +5,224 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+// ─────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────
+
+enum CompanyStatus {
+  pending
+  active
+  blocked
+
+  @@map("company_status")
+}
+
+enum SubscriptionStatus {
+  active
+  overdue
+  grace
+  blocked
+
+  @@map("subscription_status")
+}
+
+enum AppointmentStatus {
+  pending
+  confirmed
+  completed
+  cancelled
+
+  @@map("appointment_status")
+}
+
+enum CancelledBy {
+  client
+  company
+
+  @@map("cancelled_by")
+}
+
+enum NotificationType {
+  new_appointment
+  changed_appointment
+  cancelled_appointment
+  payment_due
+  payment_blocked
+
+  @@map("notification_type")
+}
+
+enum UserRole {
+  superadmin
+  company_admin
+
+  @@map("user_role")
+}
+
+// ─────────────────────────────────────────
+// Models
+// ─────────────────────────────────────────
+
+model Company {
+  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name             String        @db.VarChar(255)
+  slug             String        @unique @db.VarChar(100)
+  email            String        @unique @db.VarChar(255)
+  phone            String?       @db.VarChar(20)
+  status           CompanyStatus @default(pending)
+  bookingLinkToken String        @unique @default(dbgenerated("gen_random_uuid()")) @map("booking_link_token") @db.Uuid
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  subscriptions Subscription[]
+  users         User[]
+  staff         Staff[]
+  services      Service[]
+  businessHours BusinessHour[]
+  clients       Client[]
+  appointments  Appointment[]
+  notifications Notification[]
+
+  @@map("companies")
+}
+
+// max_staff, monthly_price and grace_period_end are GENERATED ALWAYS AS STORED
+// columns in the DB (see migration SQL). They are intentionally omitted from this
+// schema so Prisma never tries to write to them. Compute in application code:
+//   maxStaff        = planSlots * 5
+//   monthlyPrice    = planSlots * 50
+//   gracePeriodEnd  = dueDate + 5 days
+model Subscription {
+  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId        String             @map("company_id") @db.Uuid
+  planSlots        Int                @default(1) @map("plan_slots")
+  dueDate          DateTime           @map("due_date") @db.Date
+  status           SubscriptionStatus @default(active)
+  gatewayPaymentId String?            @map("gateway_payment_id") @db.VarChar(255)
+  createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime           @updatedAt @map("updated_at") @db.Timestamptz
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@map("subscriptions")
+}
+
+model User {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId    String?  @map("company_id") @db.Uuid
+  name         String   @db.VarChar(255)
+  email        String   @unique @db.VarChar(255)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  role         UserRole @default(company_admin)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  company Company? @relation(fields: [companyId], references: [id])
+
+  @@map("users")
+}
+
+model Staff {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  name      String   @db.VarChar(255)
+  email     String?  @db.VarChar(255)
+  phone     String?  @db.VarChar(20)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  company       Company        @relation(fields: [companyId], references: [id])
+  services      Service[]
+  businessHours BusinessHour[]
+  appointments  Appointment[]
+
+  @@map("staff")
+}
+
+model Service {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId       String   @map("company_id") @db.Uuid
+  staffId         String?  @map("staff_id") @db.Uuid
+  name            String   @db.VarChar(255)
+  description     String?  @db.Text
+  durationMinutes Int      @map("duration_minutes")
+  price           Decimal? @db.Decimal(10, 2)
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  company      Company       @relation(fields: [companyId], references: [id])
+  staff        Staff?        @relation(fields: [staffId], references: [id])
+  appointments Appointment[]
+
+  @@map("services")
+}
+
+model BusinessHour {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  staffId   String   @map("staff_id") @db.Uuid
+  dayOfWeek Int      @map("day_of_week") @db.SmallInt
+  openTime  DateTime @map("open_time") @db.Time
+  closeTime DateTime @map("close_time") @db.Time
+  isOpen    Boolean  @default(true) @map("is_open")
+
+  company Company @relation(fields: [companyId], references: [id])
+  staff   Staff   @relation(fields: [staffId], references: [id])
+
+  @@map("business_hours")
+}
+
+model Client {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  name        String   @db.VarChar(255)
+  email       String?  @db.VarChar(255)
+  phone       String?  @db.VarChar(20)
+  isTemporary Boolean  @default(false) @map("is_temporary")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  company      Company       @relation(fields: [companyId], references: [id])
+  appointments Appointment[]
+
+  @@map("clients")
+}
+
+model Appointment {
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId       String            @map("company_id") @db.Uuid
+  staffId         String            @map("staff_id") @db.Uuid
+  serviceId       String            @map("service_id") @db.Uuid
+  clientId        String?           @map("client_id") @db.Uuid
+  scheduledAt     DateTime          @map("scheduled_at") @db.Timestamptz
+  durationMinutes Int               @map("duration_minutes")
+  serviceName     String            @map("service_name") @db.VarChar(255)
+  status          AppointmentStatus @default(pending)
+  cancelledBy     CancelledBy?      @map("cancelled_by")
+  notes           String?           @db.Text
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+
+  company       Company        @relation(fields: [companyId], references: [id])
+  staff         Staff          @relation(fields: [staffId], references: [id])
+  service       Service        @relation(fields: [serviceId], references: [id])
+  client        Client?        @relation(fields: [clientId], references: [id])
+  notifications Notification[]
+
+  @@map("appointments")
+}
+
+model Notification {
+  id            String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId     String           @map("company_id") @db.Uuid
+  type          NotificationType
+  appointmentId String?          @map("appointment_id") @db.Uuid
+  message       String           @db.Text
+  isRead        Boolean          @default(false) @map("is_read")
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  company     Company      @relation(fields: [companyId], references: [id])
+  appointment Appointment? @relation(fields: [appointmentId], references: [id])
+
+  @@map("notifications")
 }
