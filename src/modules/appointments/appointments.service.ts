@@ -30,10 +30,14 @@ export interface UpdateAppointmentInput {
 
 export const appointmentsService = {
   async list(companyId: string, startDate: string, endDate: string, staffId?: string) {
+    const start = new Date(startDate)
+    const end   = new Date(endDate)
+    end.setUTCHours(23, 59, 59, 999)   // covers full UTC day (date-only strings parse as UTC midnight)
+
     return prisma.appointment.findMany({
       where: {
         companyId,
-        scheduledAt: { gte: new Date(startDate), lte: new Date(endDate) },
+        scheduledAt: { gte: start, lte: end },
         status: { not: 'cancelled' },
         ...(staffId ? { staffId } : {}),
       },
