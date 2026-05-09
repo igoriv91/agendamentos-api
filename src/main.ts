@@ -13,9 +13,11 @@ import businessHoursRoutes  from './modules/business-hours/business-hours.routes
 import notificationsRoutes   from './modules/notifications/notifications.routes'
 import subscriptionsRoutes  from './modules/subscriptions/subscriptions.routes'
 import webhooksRoutes        from './modules/webhooks/webhooks.routes'
+import adminRoutes           from './modules/admin/admin.routes'
 import { authMiddleware }         from './shared/middleware/auth.middleware'
 import { tenantMiddleware }       from './shared/middleware/tenant.middleware'
 import { subscriptionMiddleware } from './shared/middleware/subscription.middleware'
+import { superadminMiddleware }   from './shared/middleware/superadmin.middleware'
 import { initSocket }             from './shared/events/socket.instance'
 import { startPaymentReminderJob } from './shared/jobs/paymentReminder.job'
 import { startGracePeriodJob }     from './shared/jobs/gracePeriod.job'
@@ -48,6 +50,7 @@ app.use('/appointments',    appointmentsRoutes)
 app.use('/clients',         clientsRoutes)
 app.use('/notifications',   notificationsRoutes)
 app.use('/subscriptions',   subscriptionsRoutes)
+app.use('/admin',           superadminMiddleware, adminRoutes)
 
 io.on('connection', (socket) => {
   socket.on('join', (room: string) => {
