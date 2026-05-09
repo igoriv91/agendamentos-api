@@ -1,5 +1,6 @@
 import { addMinutes } from 'date-fns'
 import { prisma } from '../../shared/lib/prisma'
+import { createNotification } from '../../shared/events/notification.helper'
 
 export interface BookingAppointmentInput {
   staffId: string
@@ -138,6 +139,13 @@ export const bookingService = {
       },
     })
 
+    await createNotification(
+      company.id,
+      'new_appointment',
+      `Novo agendamento (link público): ${input.clientName ?? 'Cliente'} — ${service.name}`,
+      appointment.id,
+    )
+
     return { appointmentId: appointment.id, clientId }
   },
 
@@ -173,9 +181,18 @@ export const bookingService = {
       throw new Error('Cancelamentos devem ser feitos com no mínimo 30 minutos de antecedência')
     }
 
-    return prisma.appointment.update({
+    const updated = await prisma.appointment.update({
       where: { id: appointmentId },
       data: { status: 'cancelled', cancelledBy: 'client' },
     })
+
+    await createNotification(
+      company.id,
+      'cancelled_appointment',
+      `Agendamento cancelado pelo cliente: ${apt.serviceName}`,
+      appointmentId,
+    )
+
+    return updated
   },
 }

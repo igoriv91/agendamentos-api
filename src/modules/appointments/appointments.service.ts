@@ -1,4 +1,5 @@
 import { prisma } from '../../shared/lib/prisma'
+import { createNotification } from '../../shared/events/notification.helper'
 import { clientsService } from '../clients/clients.service'
 
 export interface CreateAppointmentInput {
@@ -46,7 +47,7 @@ export const appointmentsService = {
       clientId = client.id
     }
 
-    return prisma.appointment.create({
+    const appointment = await prisma.appointment.create({
       data: {
         companyId,
         staffId: input.staffId,
@@ -63,16 +64,41 @@ export const appointmentsService = {
         client: { select: { id: true, name: true, phone: true } },
       },
     })
+
+    await createNotification(
+      companyId,
+      'new_appointment',
+      `Novo agendamento: ${appointment.client?.name ?? 'Cliente'} — ${appointment.serviceName} às ${appointment.scheduledAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
+      appointment.id,
+    )
+
+    return appointment
   },
 
   async updateStatus(id: string, input: UpdateStatusInput) {
-    return prisma.appointment.update({
+    const appointment = await prisma.appointment.update({
       where: { id },
       data: {
         status: input.status,
         ...(input.cancelledBy ? { cancelledBy: input.cancelledBy } : {}),
       },
+      include: { client: { select: { name: true } } },
     })
+
+    const typeMap = {
+      cancelled: 'cancelled_appointment',
+      confirmed: 'changed_appointment',
+      completed: 'changed_appointment',
+    } as const
+
+    await createNotification(
+      appointment.companyId,
+      typeMap[input.status] ?? 'changed_appointment',
+      `Agendamento ${input.status === 'cancelled' ? 'cancelado' : input.status === 'confirmed' ? 'confirmado' : 'realizado'}: ${appointment.client?.name ?? ''} — ${appointment.serviceName}`,
+      appointment.id,
+    )
+
+    return appointment
   },
 
   async getById(id: string) {
