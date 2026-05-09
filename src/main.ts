@@ -52,7 +52,9 @@ app.use('/book/:token',    bookingRoutes)
 app.use('/webhooks',       webhooksRoutes)
 
 // Protected middleware chain applied globally after this point
-app.use(authMiddleware, tenantMiddleware, subscriptionMiddleware)
+// Note: tenantMiddleware (RLS set_config) removed — incompatible with pg connection pool.
+// Tenant isolation enforced at application layer (WHERE company_id = ? in all queries).
+app.use(authMiddleware, subscriptionMiddleware)
 
 // Protected routes
 app.use('/companies',     companiesRoutes)
