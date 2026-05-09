@@ -81,21 +81,21 @@ export const bookingService = {
       },
     })
 
-    // Enforce 30-min advance notice for client-facing booking
-    const now = new Date()
+    const now      = new Date()
     const minStart = addMinutes(now, 30)
 
-    return allSlots.filter((slot) => {
-      const [h, m] = slot.split(':').map(Number)
+    return allSlots.map((slot) => {
       const slotStart = new Date(`${date}T${slot}:00`)
       const slotEnd   = addMinutes(slotStart, duration)
 
-      if (slotStart < minStart) return false
+      if (slotStart < minStart) return { time: slot, available: false }
 
-      return !booked.some((apt) => {
+      const conflict = booked.some((apt) => {
         const aptEnd = addMinutes(apt.scheduledAt, apt.durationMinutes)
         return slotStart < aptEnd && slotEnd > apt.scheduledAt
       })
+
+      return { time: slot, available: !conflict }
     })
   },
 

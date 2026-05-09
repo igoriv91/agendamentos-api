@@ -1,3 +1,4 @@
+import { addMinutes } from 'date-fns'
 import { prisma } from '../../shared/lib/prisma'
 import { createNotification } from '../../shared/events/notification.helper'
 import { clientsService } from '../clients/clients.service'
@@ -46,6 +47,20 @@ export const appointmentsService = {
 
   async create(companyId: string, input: CreateAppointmentInput) {
     const service = await prisma.service.findUniqueOrThrow({ where: { id: input.serviceId } })
+
+    const newStart = new Date(input.scheduledAt)
+    const newEnd   = addMinutes(newStart, service.durationMinutes)
+    const dayStart = new Date(newStart); dayStart.setHours(0, 0, 0, 0)
+    const dayEnd   = new Date(newStart); dayEnd.setHours(23, 59, 59, 999)
+
+    const sameDayApts = await prisma.appointment.findMany({
+      where: { staffId: input.staffId, status: { not: 'cancelled' }, scheduledAt: { gte: dayStart, lte: dayEnd } },
+    })
+    const hasConflict = sameDayApts.some((apt) => {
+      const aptEnd = addMinutes(apt.scheduledAt, apt.durationMinutes)
+      return newStart < aptEnd && newEnd > apt.scheduledAt
+    })
+    if (hasConflict) throw new Error('Já existe um agendamento para este atendente neste horário')
 
     let clientId = input.clientId
     if (!clientId) {
@@ -122,6 +137,23 @@ export const appointmentsService = {
       const svc = await prisma.service.findUniqueOrThrow({ where: { id: input.serviceId } })
       durationMinutes = svc.durationMinutes
       serviceName = svc.name
+    }
+
+    if (input.staffId || input.scheduledAt) {
+      const checkStaffId    = input.staffId    ?? current.staffId
+      const checkScheduledAt = input.scheduledAt ? new Date(input.scheduledAt) : current.scheduledAt
+      const checkEnd        = addMinutes(checkScheduledAt, durationMinutes)
+      const dayStart = new Date(checkScheduledAt); dayStart.setHours(0, 0, 0, 0)
+      const dayEnd   = new Date(checkScheduledAt); dayEnd.setHours(23, 59, 59, 999)
+
+      const sameDayApts = await prisma.appointment.findMany({
+        where: { id: { not: id }, staffId: checkStaffId, status: { not: 'cancelled' }, scheduledAt: { gte: dayStart, lte: dayEnd } },
+      })
+      const hasConflict = sameDayApts.some((apt) => {
+        const aptEnd = addMinutes(apt.scheduledAt, apt.durationMinutes)
+        return checkScheduledAt < aptEnd && checkEnd > apt.scheduledAt
+      })
+      if (hasConflict) throw new Error('Já existe um agendamento para este atendente neste horário')
     }
 
     if (current.clientId && (input.clientName || input.clientPhone !== undefined)) {
