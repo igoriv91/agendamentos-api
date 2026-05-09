@@ -3,11 +3,13 @@ import { notificationsService } from './notifications.service'
 
 export const notificationsController = {
   async list(req: Request, res: Response) {
-    res.json(await notificationsService.list(req.user!.companyId!))
+    if (!req.user?.companyId) { res.json([]); return }
+    res.json(await notificationsService.list(req.user.companyId))
   },
 
   async markAllRead(req: Request, res: Response) {
-    await notificationsService.markAllRead(req.user!.companyId!)
+    if (!req.user?.companyId) { res.json({ message: 'ok' }); return }
+    await notificationsService.markAllRead(req.user.companyId)
     res.json({ message: 'Notificações marcadas como lidas' })
   },
 
