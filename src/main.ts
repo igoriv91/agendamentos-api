@@ -3,6 +3,7 @@ import express from 'express'
 import { createServer } from 'http'
 import { Server } from 'socket.io'
 import authRoutes         from './modules/auth/auth.routes'
+import bookingRoutes      from './modules/booking/booking.routes'
 import appointmentsRoutes from './modules/appointments/appointments.routes'
 import clientsRoutes      from './modules/clients/clients.routes'
 import companiesRoutes    from './modules/companies/companies.routes'
@@ -25,6 +26,7 @@ app.use(express.json())
 // Public routes
 app.get('/health', (_req, res) => { res.json({ status: 'ok' }) })
 app.use('/auth', authRoutes)
+app.use('/book/:token', bookingRoutes)
 
 // Protected middleware chain applied globally after this point
 app.use(authMiddleware, tenantMiddleware, subscriptionMiddleware)
