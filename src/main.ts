@@ -1,5 +1,6 @@
 import 'dotenv/config'
 import express from 'express'
+import cors from 'cors'
 import { createServer } from 'http'
 import { Server } from 'socket.io'
 import authRoutes           from './modules/auth/auth.routes'
@@ -29,6 +30,18 @@ const io = new Server(httpServer, {
   cors: { origin: process.env.FRONTEND_URL ?? 'http://localhost:5173' },
 })
 initSocket(io)
+
+const allowedOrigins = (process.env.FRONTEND_URL ?? 'http://localhost:5173').split(',').map(s => s.trim())
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (curl, Postman, server-to-server)
+    if (!origin) return callback(null, true)
+    if (allowedOrigins.includes(origin)) return callback(null, true)
+    callback(new Error(`CORS: origem não permitida — ${origin}`))
+  },
+  credentials: true,
+}))
 
 app.use(express.json())
 
