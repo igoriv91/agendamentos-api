@@ -22,11 +22,13 @@ export const clientsService = {
     return prisma.client.create({ data: { ...data, companyId, isTemporary: false } })
   },
 
-  async findOrCreate(companyId: string, name: string, phone: string) {
-    const existing = await prisma.client.findFirst({
-      where: { companyId, phone, isTemporary: false },
-    })
-    if (existing) return existing
+  async findOrCreate(companyId: string, name: string, phone?: string) {
+    if (phone) {
+      const existing = await prisma.client.findFirst({
+        where: { companyId, phone, isTemporary: false },
+      })
+      if (existing) return existing
+    }
     return prisma.client.create({ data: { companyId, name, phone, isTemporary: false } })
   },
 }

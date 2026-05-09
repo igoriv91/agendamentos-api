@@ -44,4 +44,18 @@ export const appointmentsController = {
       res.status(400).json({ message })
     }
   },
+
+  async update(req: Request, res: Response) {
+    try {
+      const appointment = await appointmentsService.update(
+        req.params['id'] as string,
+        req.user!.companyId!,
+        req.body,
+      )
+      res.json(appointment)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao atualizar agendamento'
+      res.status(400).json({ message })
+    }
+  },
 }

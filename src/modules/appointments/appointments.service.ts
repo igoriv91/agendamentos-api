@@ -18,6 +18,15 @@ export interface UpdateStatusInput {
   cancelledBy?: 'company' | 'client'
 }
 
+export interface UpdateAppointmentInput {
+  staffId?: string
+  serviceId?: string
+  scheduledAt?: string
+  clientName?: string
+  clientPhone?: string
+  notes?: string
+}
+
 export const appointmentsService = {
   async list(companyId: string, startDate: string, endDate: string, staffId?: string) {
     return prisma.appointment.findMany({
@@ -40,8 +49,8 @@ export const appointmentsService = {
 
     let clientId = input.clientId
     if (!clientId) {
-      if (!input.clientName || !input.clientPhone) {
-        throw new Error('Informe o cliente ou nome + telefone para criar um novo')
+      if (!input.clientName) {
+        throw new Error('Informe o nome do cliente para criar um novo agendamento')
       }
       const client = await clientsService.findOrCreate(companyId, input.clientName, input.clientPhone)
       clientId = client.id
@@ -99,6 +108,54 @@ export const appointmentsService = {
     )
 
     return appointment
+  },
+
+  async update(id: string, companyId: string, input: UpdateAppointmentInput) {
+    const current = await prisma.appointment.findUniqueOrThrow({
+      where: { id },
+      include: { client: true },
+    })
+
+    let durationMinutes = current.durationMinutes
+    let serviceName = current.serviceName
+    if (input.serviceId && input.serviceId !== current.serviceId) {
+      const svc = await prisma.service.findUniqueOrThrow({ where: { id: input.serviceId } })
+      durationMinutes = svc.durationMinutes
+      serviceName = svc.name
+    }
+
+    if (current.clientId && (input.clientName || input.clientPhone !== undefined)) {
+      await prisma.client.update({
+        where: { id: current.clientId },
+        data: {
+          ...(input.clientName ? { name: input.clientName } : {}),
+          ...(input.clientPhone !== undefined ? { phone: input.clientPhone || null } : {}),
+        },
+      })
+    }
+
+    const updated = await prisma.appointment.update({
+      where: { id },
+      data: {
+        ...(input.staffId    ? { staffId: input.staffId }                                              : {}),
+        ...(input.serviceId  ? { serviceId: input.serviceId, durationMinutes, serviceName }            : {}),
+        ...(input.scheduledAt ? { scheduledAt: new Date(input.scheduledAt) }                           : {}),
+        ...(input.notes !== undefined ? { notes: input.notes || null }                                 : {}),
+      },
+      include: {
+        staff:  { select: { id: true, name: true } },
+        client: { select: { id: true, name: true, phone: true } },
+      },
+    })
+
+    await createNotification(
+      companyId,
+      'changed_appointment',
+      `Agendamento alterado: ${updated.client?.name ?? ''} — ${updated.serviceName}`,
+      updated.id,
+    )
+
+    return updated
   },
 
   async getById(id: string) {
