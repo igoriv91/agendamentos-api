@@ -3,6 +3,8 @@ import express from 'express'
 import { createServer } from 'http'
 import { Server } from 'socket.io'
 import authRoutes         from './modules/auth/auth.routes'
+import appointmentsRoutes from './modules/appointments/appointments.routes'
+import clientsRoutes      from './modules/clients/clients.routes'
 import companiesRoutes    from './modules/companies/companies.routes'
 import staffRoutes        from './modules/staff/staff.routes'
 import servicesRoutes     from './modules/services/services.routes'
@@ -32,6 +34,8 @@ app.use('/companies',     companiesRoutes)
 app.use('/staff',         staffRoutes)
 app.use('/services',      servicesRoutes)
 app.use('/business-hours', businessHoursRoutes)
+app.use('/appointments',   appointmentsRoutes)
+app.use('/clients',        clientsRoutes)
 
 io.on('connection', (socket) => {
   socket.on('join', (room: string) => {
